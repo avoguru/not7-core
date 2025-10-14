@@ -218,7 +218,7 @@ Parallel execution and concurrent agent processing
 Support for multiple LLM providers (Anthropic, local models, custom endpoints)
 
 **Production Hardening**  
-Security, authentication, rate limiting, monitoring capabilities
+Security, Agent authorization, rate limiting, monitoring capabilities
 
 ---
 
