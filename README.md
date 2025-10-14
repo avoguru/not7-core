@@ -1,9 +1,17 @@
 # NOT7 - Not Your Typical Agent
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go)](https://go.dev/)
+<p align="center">
+  <img src="images/not7logo.png" alt="NOT7 Logo" width="200"/>
+</p>
 
-**A single-binary declarative agent runtime. No code. No dependencies. Just intelligence.**
+<p align="center">
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+  <a href="https://go.dev/"><img src="https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go" alt="Go Version"></a>
+</p>
+
+<p align="center">
+  <strong>A single-binary declarative agent runtime. No code. No dependencies. Just intelligence.</strong>
+</p>
 
 ---
 
@@ -17,6 +25,7 @@ NOT7 is a **config-driven agent runtime** delivered as a **single binary**. Agen
 
 - [Why NOT7?](#why-not7)
 - [Key Features](#key-features)
+- [Architecture](#architecture)
 - [Quick Start](#quick-start)
 - [Example Agent](#example-agent)
 - [Building from Source](#building-from-source)
@@ -40,6 +49,10 @@ The industry needs something between these extremes. Not too technical and progr
 - **Simple** (anyone can read JSON)
 - **Extensible** (anyone can build UIs or tooling on top)
 - **LLM-compatible** (AI can generate and evolve specs, vs having to generate the whole python / node projects)
+
+<p align="center">
+  <img src="images/not7arch.png" alt="NOT7 Architecture" width="800"/>
+</p>
 
 ### Learning from Integration Platforms
 
@@ -76,6 +89,7 @@ Server mode with HTTP API and deploy folder watching. Structured logging for obs
 Download one binary and run. Works on macOS, Linux, Windows.
 
 ---
+
 
 ## Quick Start
 
