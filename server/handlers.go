@@ -216,6 +216,29 @@ func (s *Server) runAgentByID(w http.ResponseWriter, r *http.Request, id string)
 
 	// Execute the agent
 	executionID := fmt.Sprintf("%s-%d", id, time.Now().UnixNano())
+
+	// Check for async execution
+	asyncMode := r.URL.Query().Get("async") == "true"
+
+	if asyncMode {
+		// Create execution status
+		status := s.execMgr.CreateExecution(executionID, agentSpec)
+
+		// Start background execution
+		go s.executeAsyncAgent(executionID, agentSpec)
+
+		// Return 202 Accepted with execution ID
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusAccepted)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"execution_id": executionID,
+			"status":       status.Status,
+			"message":      "Execution started in background",
+		})
+		return
+	}
+
+	// Synchronous execution (original behavior)
 	result, err := s.executeAgentWithID(executionID, agentSpec)
 
 	if err != nil {
@@ -256,7 +279,28 @@ func (s *Server) handleRunAnonymous(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Execute
+	// Check for async execution
+	asyncMode := r.URL.Query().Get("async") == "true"
+
+	if asyncMode {
+		// Create execution status
+		status := s.execMgr.CreateExecution(executionID, &agentSpec)
+
+		// Start background execution
+		go s.executeAsyncAgent(executionID, &agentSpec)
+
+		// Return 202 Accepted with execution ID
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusAccepted)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"execution_id": executionID,
+			"status":       status.Status,
+			"message":      "Execution started in background",
+		})
+		return
+	}
+
+	// Synchronous execution (original behavior)
 	result, err := s.executeAgentWithID(executionID, &agentSpec)
 	if err != nil {
 		respondError(w, executionID, fmt.Sprintf("Execution failed: %v", err), http.StatusInternalServerError)
@@ -290,4 +334,94 @@ func respondError(w http.ResponseWriter, id, message string, statusCode int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(response)
+}
+
+// handleExecutions handles execution-related requests
+func (s *Server) handleExecutions(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/v1/executions/")
+
+	// GET /executions - list all
+	if path == "" || path == "/" {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		s.listExecutions(w, r)
+		return
+	}
+
+	// Extract execution ID and action
+	parts := strings.Split(path, "/")
+	execID := parts[0]
+
+	if len(parts) == 1 {
+		// GET /executions/{id} - assume they want status
+		if r.Method == http.MethodGet {
+			s.getExecutionStatus(w, r, execID)
+			return
+		}
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	action := parts[1]
+	switch action {
+	case "status":
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		s.getExecutionStatus(w, r, execID)
+	case "result":
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		s.getExecutionResult(w, r, execID)
+	default:
+		http.Error(w, "Unknown action", http.StatusNotFound)
+	}
+}
+
+// listExecutions handles GET /api/v1/executions
+func (s *Server) listExecutions(w http.ResponseWriter, r *http.Request) {
+	executions := s.execMgr.ListExecutions()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"executions": executions,
+		"count":      len(executions),
+	})
+}
+
+// getExecutionStatus handles GET /api/v1/executions/{id}/status
+func (s *Server) getExecutionStatus(w http.ResponseWriter, r *http.Request, execID string) {
+	status, err := s.execMgr.GetStatus(execID)
+	if err != nil {
+		if os.IsNotExist(err) {
+			respondError(w, execID, "Execution not found", http.StatusNotFound)
+		} else {
+			respondError(w, execID, fmt.Sprintf("Failed to get status: %v", err), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(status)
+}
+
+// getExecutionResult handles GET /api/v1/executions/{id}/result
+func (s *Server) getExecutionResult(w http.ResponseWriter, r *http.Request, execID string) {
+	result, err := s.execMgr.LoadResult(execID)
+	if err != nil {
+		if os.IsNotExist(err) {
+			respondError(w, execID, "Result not available yet or execution not found", http.StatusNotFound)
+		} else {
+			respondError(w, execID, fmt.Sprintf("Failed to load result: %v", err), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
 }

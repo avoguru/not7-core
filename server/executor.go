@@ -111,3 +111,47 @@ func (s *Server) executeAgentFromFile(filePath string) {
 	fmt.Printf("[File Watcher] ✅ Completed %s in %dms (cost: $%.4f)\n",
 		filepath.Base(filePath), duration, metadata.TotalCost)
 }
+
+// executeAsyncAgent runs an agent in the background with status tracking
+func (s *Server) executeAsyncAgent(executionID string, agentSpec *spec.AgentSpec) {
+	startTime := time.Now()
+	
+	// Update status to running
+	s.execMgr.UpdateStatus(executionID, "running")
+	
+	fmt.Printf("[Async] Started execution: %s\n", executionID)
+	
+	// Execute the agent
+	result, err := s.executeAgentWithID(executionID, agentSpec)
+	
+	if err != nil {
+		// Mark as failed
+		s.execMgr.UpdateStatus(executionID, "failed")
+		
+		// Save error result
+		errorResult := &ExecutionResponse{
+			ID:     executionID,
+			Status: "failed",
+			Error:  err.Error(),
+		}
+		s.execMgr.SaveResult(executionID, errorResult)
+		
+		fmt.Printf("[Async] Failed execution: %s - %v\n", executionID, err)
+		return
+	}
+	
+	// Mark as completed
+	s.execMgr.UpdateStatus(executionID, "completed")
+	
+	// Update final metrics
+	elapsed := time.Since(startTime).Milliseconds()
+	s.execMgr.UpdateProgress(executionID, len(agentSpec.Nodes), "", "", result.Cost, elapsed)
+	
+	// Save result
+	if err := s.execMgr.SaveResult(executionID, result); err != nil {
+		fmt.Printf("[Async] Failed to save result: %v\n", err)
+	}
+	
+	fmt.Printf("[Async] Completed execution: %s (%.2fs, $%.4f)\n", 
+		executionID, float64(elapsed)/1000, result.Cost)
+}

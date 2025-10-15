@@ -4,27 +4,13 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/not7/core/client"
 	"github.com/not7/core/config"
-	"github.com/not7/core/executor"
 	"github.com/not7/core/server"
 	"github.com/not7/core/spec"
 )
 
 func main() {
-	// Load configuration first
-	configFile := "not7.conf"
-	if envConfig := os.Getenv("NOT7_CONFIG"); envConfig != "" {
-		configFile = envConfig
-	}
-	
-	if _, err := config.LoadConfig(configFile); err != nil {
-		fmt.Printf("❌ Failed to load config from %s: %v\n", configFile, err)
-		fmt.Println("\nPlease copy not7.conf.example to not7.conf and update with your API key:")
-		fmt.Println("  cp not7.conf.example not7.conf")
-		fmt.Println("  # Then edit not7.conf with your OpenAI API key")
-		os.Exit(1)
-	}
-
 	if len(os.Args) < 2 {
 		printUsage()
 		os.Exit(1)
@@ -32,15 +18,37 @@ func main() {
 
 	command := os.Args[1]
 
+	// Only server needs config loaded upfront
+	if command == "serve" {
+		loadConfig()
+	}
+
 	switch command {
+	case "serve":
+		runServer()
 	case "run":
-		// If no file argument, start server mode
 		if len(os.Args) < 3 {
-			runServer()
-		} else {
-			// One-off execution with file argument
-			runAgent(os.Args[2])
+			fmt.Println("Error: spec file required")
+			printUsage()
+			os.Exit(1)
 		}
+		runAgent(os.Args[2])
+	case "status":
+		if len(os.Args) < 3 {
+			fmt.Println("Error: execution ID required")
+			printUsage()
+			os.Exit(1)
+		}
+		getStatus(os.Args[2])
+	case "result":
+		if len(os.Args) < 3 {
+			fmt.Println("Error: execution ID required")
+			printUsage()
+			os.Exit(1)
+		}
+		getResult(os.Args[2])
+	case "agents":
+		listAgents()
 	case "validate":
 		if len(os.Args) < 3 {
 			fmt.Println("Error: spec file required")
@@ -58,121 +66,196 @@ func main() {
 	}
 }
 
+func loadConfig() {
+	configFile := "not7.conf"
+	if envConfig := os.Getenv("NOT7_CONFIG"); envConfig != "" {
+		configFile = envConfig
+	}
+	
+	if _, err := config.LoadConfig(configFile); err != nil {
+		fmt.Printf("❌ Failed to load config from %s: %v\n", configFile, err)
+		fmt.Println("\nPlease copy not7.conf.example to not7.conf and update with your API key:")
+		fmt.Println("  cp not7.conf.example not7.conf")
+		fmt.Println("  # Then edit not7.conf with your OpenAI API key")
+		os.Exit(1)
+	}
+}
+
 func printUsage() {
 	fmt.Println(`
-NOT7 - Not Your Typical Agent | Agent Runtime
+NOT7 - Agent Runtime
 
 Usage:
-  not7 run [agent.json]       Run an agent (one-off if file provided, server if no file)
-  not7 validate <agent.json>  Validate a specification file
-  not7 --help                 Show this help message
+  not7 serve                  Start server (required)
+  not7 run <agent.json>       Execute agent
+  not7 status <exec-id>       Check execution status
+  not7 result <exec-id>       Get execution result
+  not7 agents                 List deployed agents
+  not7 validate <agent.json>  Validate spec (offline)
 
-Setup:
-  1. Copy not7.conf.example to not7.conf
-  2. Edit 'not7.conf' with your OpenAI API key (OpenAI.api_key = sk-...)
-  3. Start using NOT7!
-
-One-off Execution:
-  not7 run agent.json         Execute agent immediately and exit
-
-Server Mode:
-  not7 run                    Start server for production deployment
-  
-  Server accepts agents via:
-    • HTTP API: POST /api/v1/agents/run
-    • Deploy folder: Drop JSON files in deploy/ directory
-
-Configuration:
-  NOT7_CONFIG                 Path to config file (default: ./not7.conf)
-  
-  All settings in simple key=value format (not7.conf file):
-    OpenAI.api_key                 Your OpenAI API key
-    OpenAI.default_model           Model to use (gpt-4, gpt-3.5-turbo, etc.)
-    OpenAI.default_temperature     Creativity (0.0-2.0)
-    OpenAI.default_max_tokens      Max response length
-    Server.port                    HTTP port
-    Server.deploy_dir              Deploy folder path
-    Server.log_dir                 Logs folder path
-    Watcher.poll_interval_seconds  File check frequency
+Workflow:
+  Terminal 1: not7 serve                    # Start server
+  Terminal 2: not7 run agent.json           # Execute
+  Terminal 2: not7 status exec-123          # Check progress
+  Terminal 2: not7 result exec-123          # Get result
 
 Examples:
-  # Development (one-off execution)
+  # Terminal 1
+  not7 serve
+
+  # Terminal 2
   not7 run examples/poem-generator.json
-
-  # Production (server mode)
-  not7 run
-  
-  # Then deploy via HTTP or file drop
-  curl -X POST http://localhost:8080/api/v1/agents/run -d @agent.json
-  # or
-  cp agent.json deploy/
+  not7 run examples/problem-solver.json --async
+  not7 status exec-1234567890
+  not7 result exec-1234567890
+  not7 agents
 `)
-}
-
-func runAgent(specFile string) {
-	fmt.Println("NOT7 - Agent Runtime")
-	fmt.Println("====================\n")
-
-	// Load spec
-	fmt.Printf("📖 Loading spec: %s\n", specFile)
-	agentSpec, err := spec.LoadSpec(specFile)
-	if err != nil {
-		fmt.Printf("❌ Failed to load spec: %v\n", err)
-		os.Exit(1)
-	}
-	fmt.Println("✓ Spec loaded successfully\n")
-
-	// Create executor
-	exec, err := executor.NewExecutor(agentSpec)
-	if err != nil {
-		fmt.Printf("❌ Failed to create executor: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Execute
-	output, err := exec.Execute("")
-	if err != nil {
-		fmt.Printf("❌ Execution failed: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Display results
-	fmt.Println("📄 Output:")
-	fmt.Println("─────────────────────────────────────")
-	fmt.Println(output)
-	fmt.Println("─────────────────────────────────────")
-
-	// Save results
-	resultFile := specFile + ".result.json"
-	if err := spec.SaveSpec(agentSpec, resultFile); err != nil {
-		fmt.Printf("⚠️  Warning: Failed to save results: %v\n", err)
-	} else {
-		fmt.Printf("\n💾 Results saved to: %s\n", resultFile)
-	}
-}
-
-func validateSpec(specFile string) {
-	fmt.Printf("Validating spec: %s\n", specFile)
-
-	agentSpec, err := spec.LoadSpec(specFile)
-	if err != nil {
-		fmt.Printf("❌ Validation failed: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Println("✅ Spec is valid!")
-	fmt.Printf("   Goal: %s\n", agentSpec.Goal)
-	fmt.Printf("   Nodes: %d\n", len(agentSpec.Nodes))
-	fmt.Printf("   Routes: %d\n", len(agentSpec.Routes))
 }
 
 func runServer() {
 	cfg := config.Get()
-	
-	// Create and start server using config values
 	srv := server.NewServer(cfg.Server.Port, cfg.Server.DeployDir, cfg.Server.LogDir)
 	if err := srv.Start(); err != nil {
 		fmt.Printf("❌ Server error: %v\n", err)
 		os.Exit(1)
+	}
+}
+
+func runAgent(specFile string) {
+	apiClient := client.NewClient("")
+	
+	if err := apiClient.CheckHealth(); err != nil {
+		fmt.Println("❌ Server not running. Start server first:")
+		fmt.Println("  Terminal 1: not7 serve")
+		fmt.Println("  Terminal 2: not7 run agent.json")
+		os.Exit(1)
+	}
+	
+	agentJSON, err := os.ReadFile(specFile)
+	if err != nil {
+		fmt.Printf("❌ Failed to read spec: %v\n", err)
+		os.Exit(1)
+	}
+	
+	fmt.Printf("📖 Executing: %s\n", specFile)
+	
+	asyncMode := len(os.Args) > 3 && os.Args[3] == "--async"
+	
+	result, err := apiClient.RunAgent(agentJSON, asyncMode)
+	if err != nil {
+		fmt.Printf("❌ %v\n", err)
+		os.Exit(1)
+	}
+	
+	if asyncMode {
+		fmt.Printf("\n✅ Submitted (background)\n")
+		fmt.Printf("📋 Execution ID: %s\n\n", result["execution_id"])
+		fmt.Printf("Check: not7 status %s\n", result["execution_id"])
+	} else {
+		printExecutionResult(result)
+	}
+}
+
+func getStatus(execID string) {
+	apiClient := client.NewClient("")
+	
+	if err := apiClient.CheckHealth(); err != nil {
+		fmt.Println("❌ Server not running")
+		os.Exit(1)
+	}
+	
+	status, err := apiClient.GetExecutionStatus(execID)
+	if err != nil {
+		fmt.Printf("❌ %v\n", err)
+		os.Exit(1)
+	}
+	
+	fmt.Printf("Execution: %s\n", execID)
+	fmt.Printf("Status: %s\n", status["status"])
+	fmt.Printf("Goal: %s\n", status["goal"])
+	
+	if progress, ok := status["progress"].(map[string]interface{}); ok {
+		fmt.Printf("Progress: %v/%v nodes\n", 
+			progress["completed_nodes"], progress["total_nodes"])
+	}
+}
+
+func getResult(execID string) {
+	apiClient := client.NewClient("")
+	
+	if err := apiClient.CheckHealth(); err != nil {
+		fmt.Println("❌ Server not running")
+		os.Exit(1)
+	}
+	
+	result, err := apiClient.GetExecutionResult(execID)
+	if err != nil {
+		fmt.Printf("❌ %v\n", err)
+		os.Exit(1)
+	}
+	
+	printExecutionResult(result)
+}
+
+func listAgents() {
+	apiClient := client.NewClient("")
+	
+	if err := apiClient.CheckHealth(); err != nil {
+		fmt.Println("❌ Server not running")
+		os.Exit(1)
+	}
+	
+	result, err := apiClient.ListAgents()
+	if err != nil {
+		fmt.Printf("❌ %v\n", err)
+		os.Exit(1)
+	}
+	
+	count := int(result["count"].(float64))
+	fmt.Printf("Deployed Agents: %d\n\n", count)
+	
+	if agents, ok := result["agents"].([]interface{}); ok {
+		for _, a := range agents {
+			agent := a.(map[string]interface{})
+			fmt.Printf("• %s - %s\n", agent["id"], agent["goal"])
+		}
+	}
+}
+
+func validateSpec(specFile string) {
+	fmt.Printf("Validating: %s\n", specFile)
+
+	agentSpec, err := spec.LoadSpec(specFile)
+	if err != nil {
+		fmt.Printf("❌ Invalid: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("✅ Valid!")
+	fmt.Printf("   Goal: %s\n", agentSpec.Goal)
+	fmt.Printf("   Nodes: %d\n", len(agentSpec.Nodes))
+}
+
+func printExecutionResult(result map[string]interface{}) {
+	if status, ok := result["status"].(string); ok && status == "error" {
+		fmt.Printf("\n❌ Failed: %s\n", result["error"])
+		return
+	}
+	
+	fmt.Printf("\n✅ Completed\n")
+	
+	if cost, ok := result["cost"].(float64); ok {
+		fmt.Printf("💰 Cost: $%.4f\n", cost)
+	}
+	
+	if duration, ok := result["duration_ms"].(float64); ok {
+		fmt.Printf("⏱️  Time: %.1fs\n", duration/1000)
+	}
+	
+	if output, ok := result["output"].(string); ok {
+		fmt.Println("\n📄 Output:")
+		fmt.Println("─────────────────────────────────────")
+		fmt.Println(output)
+		fmt.Println("─────────────────────────────────────")
 	}
 }

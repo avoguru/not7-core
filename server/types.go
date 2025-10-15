@@ -18,3 +18,24 @@ type AgentInfo struct {
 	Goal      string `json:"goal"`
 	CreatedAt string `json:"created_at"`
 }
+
+// ExecutionStatus represents the current state of an execution
+type ExecutionStatus struct {
+	ExecutionID string    `json:"execution_id"`
+	Status      string    `json:"status"` // queued, running, completed, failed
+	AgentID     string    `json:"agent_id,omitempty"`
+	Goal        string    `json:"goal"`
+	StartedAt   string    `json:"started_at,omitempty"`
+	CompletedAt string    `json:"completed_at,omitempty"`
+	Progress    *Progress `json:"progress,omitempty"`
+	CostSoFar   float64   `json:"cost_so_far,omitempty"`
+	ElapsedMs   int64     `json:"elapsed_ms,omitempty"`
+}
+
+// Progress tracks execution progress
+type Progress struct {
+	TotalNodes      int    `json:"total_nodes"`
+	CompletedNodes  int    `json:"completed_nodes"`
+	CurrentNode     string `json:"current_node,omitempty"`
+	CurrentNodeType string `json:"current_node_type,omitempty"`
+}
