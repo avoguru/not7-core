@@ -1,0 +1,60 @@
+{
+  "id": "feedback-analyzer",
+  "version": "1.0.0",
+  "goal": "Analyze customer feedback and generate actionable insights",
+  
+  "config": {
+    "llm": {
+      "provider": "openai",
+      "model": "gpt-4",
+      "temperature": 0.3
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "extract_themes",
+      "name": "Extract Key Themes",
+      "type": "llm",
+      "prompt": "You will receive customer feedback. Extract 3-5 key themes or topics mentioned. Return as a JSON array of strings. Example: [\"pricing concerns\", \"feature requests\", \"performance issues\"]. Be concise.",
+      "input_format": "text",
+      "output_format": "json"
+    },
+    {
+      "id": "analyze_sentiment",
+      "name": "Analyze Sentiment",
+      "type": "llm",
+      "prompt": "Based on these themes from customer feedback, analyze the overall sentiment. For each theme, indicate if it's positive, negative, or neutral, and provide a brief explanation. Return as JSON: {\"overall_sentiment\": \"positive|negative|neutral\", \"themes_analysis\": [{\"theme\": \"...\", \"sentiment\": \"...\", \"reasoning\": \"...\"}]}",
+      "input_format": "json",
+      "output_format": "json"
+    },
+    {
+      "id": "generate_summary",
+      "name": "Generate Executive Summary",
+      "type": "llm",
+      "prompt": "Create a concise executive summary for leadership based on this sentiment analysis. Include: 1) Overall customer sentiment, 2) Top 3 themes requiring attention, 3) Recommended actions. Format as clear, professional text suitable for executives. Keep it under 200 words.",
+      "input_format": "json",
+      "output_format": "text"
+    }
+  ],
+
+  "routes": [
+    {
+      "from": "start",
+      "to": "extract_themes"
+    },
+    {
+      "from": "extract_themes",
+      "to": "analyze_sentiment"
+    },
+    {
+      "from": "analyze_sentiment",
+      "to": "generate_summary"
+    },
+    {
+      "from": "generate_summary",
+      "to": "end"
+    }
+  ]
+}
+
