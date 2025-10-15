@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
+	"strings"
 	"time"
 
+	"github.com/not7/core/config"
 	"github.com/not7/core/spec"
 )
 
@@ -20,15 +21,16 @@ type OpenAIClient struct {
 
 // NewOpenAIClient creates a new OpenAI client
 func NewOpenAIClient() (*OpenAIClient, error) {
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	if apiKey == "" {
-		return nil, fmt.Errorf("OPENAI_API_KEY environment variable not set")
+	cfg := config.Get()
+	
+	if cfg.OpenAI.APIKey == "" {
+		return nil, fmt.Errorf("OpenAI API key not configured in not7.conf")
 	}
 
 	return &OpenAIClient{
-		apiKey: apiKey,
+		apiKey: cfg.OpenAI.APIKey,
 		httpClient: &http.Client{
-			Timeout: 60 * time.Second,
+			Timeout: 120 * time.Second,
 		},
 	}, nil
 }
@@ -145,23 +147,23 @@ func (c *OpenAIClient) Execute(config *spec.LLMConfig, prompt string, input stri
 
 // calculateCost estimates the cost based on token usage
 func calculateCost(model string, usage Usage) float64 {
-	// Approximate pricing (as of 2024)
 	var inputCostPer1k, outputCostPer1k float64
 
-	switch model {
-	case "gpt-4":
-		inputCostPer1k = 0.03
-		outputCostPer1k = 0.06
-	case "gpt-4-turbo", "gpt-4-turbo-preview":
+	// Approximate pricing (as of Oct 2024)
+	switch {
+	case strings.Contains(model, "gpt-4-turbo"):
 		inputCostPer1k = 0.01
 		outputCostPer1k = 0.03
-	case "gpt-3.5-turbo":
+	case strings.Contains(model, "gpt-4"):
+		inputCostPer1k = 0.03
+		outputCostPer1k = 0.06
+	case strings.Contains(model, "gpt-3.5"):
 		inputCostPer1k = 0.0005
 		outputCostPer1k = 0.0015
 	default:
-		// Default to gpt-3.5-turbo pricing
-		inputCostPer1k = 0.0005
-		outputCostPer1k = 0.0015
+		// Conservative estimate
+		inputCostPer1k = 0.01
+		outputCostPer1k = 0.03
 	}
 
 	inputCost := float64(usage.PromptTokens) / 1000.0 * inputCostPer1k
@@ -169,4 +171,3 @@ func calculateCost(model string, usage Usage) float64 {
 
 	return inputCost + outputCost
 }
-

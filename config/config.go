@@ -74,10 +74,10 @@ func LoadConfig(filepath string) (*Config, error) {
 			continue
 		}
 
-		// Parse key = value
+		// Parse KEY=value (standard .env format)
 		parts := strings.SplitN(line, "=", 2)
 		if len(parts) != 2 {
-			return nil, fmt.Errorf("line %d: invalid format (expected: key = value)", lineNum)
+			return nil, fmt.Errorf("line %d: invalid format (expected: KEY=value)", lineNum)
 		}
 
 		key := strings.TrimSpace(parts[0])

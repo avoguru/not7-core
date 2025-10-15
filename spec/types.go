@@ -2,18 +2,19 @@ package spec
 
 // AgentSpec represents the complete NOT7 agent specification
 type AgentSpec struct {
-	Version  string         `json:"version"`
-	Goal     string         `json:"goal"`
-	Config   *Config        `json:"config,omitempty"`
-	Nodes    []Node         `json:"nodes"`
-	Routes   []Route        `json:"routes"`
-	Metadata *Metadata      `json:"metadata,omitempty"`
+	ID       string    `json:"id,omitempty"`
+	Version  string    `json:"version"`
+	Goal     string    `json:"goal"`
+	Config   *Config   `json:"config,omitempty"`
+	Nodes    []Node    `json:"nodes"`
+	Routes   []Route   `json:"routes"`
+	Metadata *Metadata `json:"metadata,omitempty"`
 }
 
 // Config holds global configuration
 type Config struct {
-	LLM         *LLMConfig    `json:"llm,omitempty"`
-	Constraints *Constraints  `json:"constraints,omitempty"`
+	LLM         *LLMConfig   `json:"llm,omitempty"`
+	Constraints *Constraints `json:"constraints,omitempty"`
 }
 
 // LLMConfig defines language model settings
@@ -52,18 +53,18 @@ type Route struct {
 
 // Condition defines routing logic
 type Condition struct {
-	Type       string `json:"type"`       // "success", "failure", "expression"
+	Type       string `json:"type"` // "success", "failure", "expression"
 	Expression string `json:"expression,omitempty"`
 }
 
 // Metadata holds execution results
 type Metadata struct {
-	CreatedAt       string        `json:"created_at,omitempty"`
-	ExecutedAt      string        `json:"executed_at,omitempty"`
-	ExecutionTimeMs int64         `json:"execution_time_ms,omitempty"`
-	TotalCost       float64       `json:"total_cost,omitempty"`
-	Status          string        `json:"status,omitempty"`
-	NodeResults     []NodeResult  `json:"node_results,omitempty"`
+	CreatedAt       string       `json:"created_at,omitempty"`
+	ExecutedAt      string       `json:"executed_at,omitempty"`
+	ExecutionTimeMs int64        `json:"execution_time_ms,omitempty"`
+	TotalCost       float64      `json:"total_cost,omitempty"`
+	Status          string       `json:"status,omitempty"`
+	NodeResults     []NodeResult `json:"node_results,omitempty"`
 }
 
 // NodeResult holds results from a single node execution
@@ -76,4 +77,3 @@ type NodeResult struct {
 	Output          interface{} `json:"output,omitempty"`
 	Error           string      `json:"error,omitempty"`
 }
-

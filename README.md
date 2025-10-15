@@ -98,7 +98,7 @@ Download one binary and run. Works on macOS, Linux, Windows.
 curl -L https://github.com/not7/core/raw/main/dist/not7-darwin-arm64 -o not7
 chmod +x not7
 cp not7.conf.example not7.conf
-# Edit not7.conf: OPENAI_API_KEY = sk-your-key
+# Edit not7.conf: OPENAI_API_KEY=sk-your-key
 ./not7 run examples/poem-generator.json
 ```
 
@@ -106,6 +106,89 @@ cp not7.conf.example not7.conf
 See [dist/](dist/) folder for other platform binaries.
 
 **That's it!** The agent executes and generates output.
+
+---
+
+## API Reference
+
+NOT7 provides a full REST API for managing and executing agents.
+
+### Deploy & Manage Agents
+
+**Deploy Agent (without executing):**
+```bash
+POST /api/v1/agents
+Content-Type: application/json
+
+{
+  "id": "my-agent",
+  "version": "1.0.0",
+  "goal": "Do something",
+  "nodes": [...],
+  "routes": [...]
+}
+```
+
+**List All Agents:**
+```bash
+GET /api/v1/agents
+```
+
+**Get Agent:**
+```bash
+GET /api/v1/agents/{id}
+```
+
+**Update Agent:**
+```bash
+PUT /api/v1/agents/{id}
+Content-Type: application/json
+
+{ ...updated agent spec... }
+```
+
+**Delete Agent:**
+```bash
+DELETE /api/v1/agents/{id}
+```
+
+### Execute Agents
+
+**Execute Deployed Agent:**
+```bash
+POST /api/v1/agents/{id}/run
+```
+
+**Execute Anonymous Agent (no save):**
+```bash
+POST /api/v1/agents/run
+Content-Type: application/json
+
+{ ...agent spec... }
+```
+
+### Example Workflow
+
+```bash
+# 1. Deploy an agent
+curl -X POST http://localhost:8080/api/v1/agents \
+  -H "Content-Type: application/json" \
+  -d @examples/poem-generator.json
+
+# 2. List agents
+curl http://localhost:8080/api/v1/agents
+
+# 3. Run agent (can trigger multiple times)
+curl -X POST http://localhost:8080/api/v1/agents/poem-generator/run
+
+# 4. Update agent
+curl -X PUT http://localhost:8080/api/v1/agents/poem-generator \
+  -H "Content-Type: application/json" \
+  -d @examples/poem-generator-v2.json
+
+# 5. Delete agent
+curl -X DELETE http://localhost:8080/api/v1/agents/poem-generator
+```
 
 ---
 
