@@ -1,0 +1,31 @@
+{
+  "id": "strategy-planner",
+  "version": "1.0.0",
+  "goal": "Create a comprehensive technical strategy with multi-step reasoning",
+  
+  "config": {
+    "llm": {
+      "provider": "openai",
+      "model": "gpt-4",
+      "temperature": 0.7,
+      "max_tokens": 2000
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "strategize",
+      "name": "Strategic Planning with ReAct",
+      "type": "react",
+      "react_goal": "Design a comprehensive technical architecture for a real-time collaborative document editing system (like Google Docs). Consider: data synchronization, conflict resolution, scalability, offline support, and performance. Provide specific technical recommendations.",
+      "max_iterations": 5,
+      "output_format": "text"
+    }
+  ],
+
+  "routes": [
+    {"from": "start", "to": "strategize"},
+    {"from": "strategize", "to": "end"}
+  ]
+}
+

@@ -164,16 +164,20 @@ func (e *Executor) executeNode(nodeID string, input string) (string, error) {
 	var output string
 	var cost float64
 	var err error
+	var reactTrace *spec.ReActTrace
 
 	switch node.Type {
 	case "llm":
 		output, cost, err = e.executeLLMNode(node, input)
+	case "react":
+		output, cost, reactTrace, err = e.executeReActNode(node, input)
 	default:
 		err = fmt.Errorf("unsupported node type: %s", node.Type)
 	}
+	result.Cost = cost
 
 	result.ExecutionTimeMs = time.Since(startTime).Milliseconds()
-	result.Cost = cost
+	result.ReActTrace = reactTrace
 
 	if err != nil {
 		result.Status = "failed"
