@@ -13,6 +13,7 @@ type Config struct {
 	OpenAI  OpenAIConfig
 	Server  ServerConfig
 	Watcher WatcherConfig
+	Builtin BuiltinConfig
 }
 
 // OpenAIConfig holds OpenAI-specific configuration
@@ -33,6 +34,11 @@ type ServerConfig struct {
 // WatcherConfig holds file watcher settings
 type WatcherConfig struct {
 	PollIntervalSeconds int
+}
+
+// BuiltinConfig holds built-in tool provider settings
+type BuiltinConfig struct {
+	SerpAPIKey string
 }
 
 var globalConfig *Config
@@ -142,6 +148,10 @@ func setConfigValue(cfg *Config, key, value string) error {
 			return fmt.Errorf("invalid poll_interval value: %s", value)
 		}
 		cfg.Watcher.PollIntervalSeconds = interval
+
+	// Builtin tool settings
+	case "SERP_API_KEY":
+		cfg.Builtin.SerpAPIKey = value
 
 	default:
 		return fmt.Errorf("unknown config key: %s", key)

@@ -1,12 +1,16 @@
 package executor
 
 import (
+	"context"
 	"fmt"
 	"time"
 
+	"github.com/not7/core/config"
 	"github.com/not7/core/llm"
 	"github.com/not7/core/logger"
 	"github.com/not7/core/spec"
+	"github.com/not7/core/tools"
+	"github.com/not7/core/tools/builtin"
 )
 
 // Logger interface for logging
@@ -24,6 +28,7 @@ type Executor struct {
 	results   map[string]*spec.NodeResult
 	logger    Logger
 	useCLI    bool // Flag to determine if we should print to stdout
+	toolMgr   *tools.Manager // Tool manager for tool calling
 }
 
 // NewExecutor creates a new executor for CLI mode (prints to stdout)
@@ -49,6 +54,32 @@ func newExecutor(agentSpec *spec.AgentSpec, log Logger, useCLI bool) (*Executor,
 		nodeMap[agentSpec.Nodes[i].ID] = &agentSpec.Nodes[i]
 	}
 
+	// Initialize tool manager if tools are configured
+	var toolMgr *tools.Manager
+	if agentSpec.Config != nil && agentSpec.Config.Tools != nil {
+		cfg := config.Get()
+
+		toolMgr = tools.NewManager("")
+
+		// Register builtin tool provider
+		if agentSpec.Config.Tools.Provider == "builtin" && cfg.Builtin.SerpAPIKey != "" {
+			builtinProvider := builtin.NewProvider(cfg.Builtin.SerpAPIKey)
+			providerConfig := map[string]string{
+				"serp_api_key": cfg.Builtin.SerpAPIKey,
+			}
+
+			if err := builtinProvider.Initialize(providerConfig); err != nil {
+				return nil, fmt.Errorf("failed to initialize builtin provider: %w", err)
+			}
+
+			if err := toolMgr.RegisterProvider(builtinProvider); err != nil {
+				return nil, fmt.Errorf("failed to register builtin provider: %w", err)
+			}
+
+			log.Info("Builtin tool provider initialized with %d tools", len(toolMgr.ListTools()))
+		}
+	}
+
 	return &Executor{
 		spec:      agentSpec,
 		llmClient: llmClient,
@@ -56,6 +87,7 @@ func newExecutor(agentSpec *spec.AgentSpec, log Logger, useCLI bool) (*Executor,
 		results:   make(map[string]*spec.NodeResult),
 		logger:    log,
 		useCLI:    useCLI,
+		toolMgr:   toolMgr,
 	}, nil
 }
 
@@ -170,7 +202,14 @@ func (e *Executor) executeNode(nodeID string, input string) (string, error) {
 	case "llm":
 		output, cost, err = e.executeLLMNode(node, input)
 	case "react":
-		output, cost, reactTrace, err = e.executeReActNode(node, input)
+		// Check if tools are enabled for this node
+		if node.ToolsEnabled && e.toolMgr != nil && e.toolMgr.HasTools() {
+			output, cost, reactTrace, err = e.executeReActNodeWithTools(node, input, e.toolMgr)
+		} else {
+			output, cost, reactTrace, err = e.executeReActNode(node, input)
+		}
+	case "tool":
+		output, cost, err = e.executeToolNode(node, input)
 	default:
 		err = fmt.Errorf("unsupported node type: %s", node.Type)
 	}
@@ -200,6 +239,49 @@ func (e *Executor) executeNode(nodeID string, input string) (string, error) {
 	}
 
 	return output, nil
+}
+
+// executeToolNode executes an explicit tool node
+func (e *Executor) executeToolNode(node *spec.Node, input string) (string, float64, error) {
+	if e.toolMgr == nil {
+		return "", 0, fmt.Errorf("tool manager not initialized - tools not configured")
+	}
+
+	if node.ToolName == "" {
+		return "", 0, fmt.Errorf("tool_name is required for tool nodes")
+	}
+
+	e.logger.Info("Executing tool: %s", node.ToolName)
+
+	// Prepare arguments
+	args := node.ToolArguments
+	if args == nil {
+		args = make(map[string]interface{})
+	}
+
+	// Support {{input}} placeholder in arguments
+	for key, val := range args {
+		if strVal, ok := val.(string); ok && strVal == "{{input}}" {
+			args[key] = input
+		}
+	}
+
+	// Execute tool
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	result, err := e.toolMgr.ExecuteTool(ctx, node.ToolName, args)
+	if err != nil {
+		return "", 0, fmt.Errorf("tool execution failed: %w", err)
+	}
+
+	if !result.Success {
+		return "", 0, fmt.Errorf("tool returned error: %s", result.Error)
+	}
+
+	// Convert output to string
+	output := fmt.Sprintf("%v", result.Output)
+	return output, 0, nil
 }
 
 // executeLLMNode executes an LLM node

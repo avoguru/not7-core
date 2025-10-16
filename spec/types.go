@@ -15,6 +15,7 @@ type AgentSpec struct {
 type Config struct {
 	LLM         *LLMConfig    `json:"llm,omitempty"`
 	Constraints *Constraints  `json:"constraints,omitempty"`
+	Tools       *ToolsConfig  `json:"tools,omitempty"`
 }
 
 // LLMConfig defines language model settings
@@ -32,6 +33,12 @@ type Constraints struct {
 	MaxRetries int     `json:"max_retries,omitempty"`
 }
 
+// ToolsConfig defines tool provider settings
+type ToolsConfig struct {
+	Provider     string   `json:"provider"`      // "builtin" or "mcp"
+	Enabled      []string `json:"enabled,omitempty"` // List of enabled tool names (optional)
+}
+
 // Node represents a single execution unit
 type Node struct {
 	ID           string     `json:"id"`
@@ -41,11 +48,17 @@ type Node struct {
 	InputFormat  string     `json:"input_format,omitempty"`
 	OutputFormat string     `json:"output_format,omitempty"`
 	LLM          *LLMConfig `json:"llm,omitempty"`
-	
+
 	// ReAct-specific fields
 	ReActGoal      string `json:"react_goal,omitempty"`
 	MaxIterations  int    `json:"max_iterations,omitempty"`
 	ThinkingPrompt string `json:"thinking_prompt,omitempty"`
+
+	// Tool-specific fields
+	ToolsEnabled   bool     `json:"tools_enabled,omitempty"`    // Enable tool calling in ReAct
+	AvailableTools []string `json:"available_tools,omitempty"`  // Whitelist of tools for ReAct
+	ToolName       string   `json:"tool_name,omitempty"`        // Tool name for explicit tool nodes
+	ToolArguments  map[string]interface{} `json:"tool_arguments,omitempty"` // Arguments for explicit tool nodes
 }
 
 // Route defines connection between nodes
@@ -98,4 +111,14 @@ type ThinkingStep struct {
 	Thought    string  `json:"thought"`
 	DurationMs int64   `json:"duration_ms"`
 	Cost       float64 `json:"cost"`
+	ToolCalls  []ToolCallTrace `json:"tool_calls,omitempty"` // Tool calls made in this iteration
+}
+
+// ToolCallTrace represents a tool call during ReAct execution
+type ToolCallTrace struct {
+	ToolName  string                 `json:"tool_name"`
+	Arguments map[string]interface{} `json:"arguments"`
+	Result    interface{}            `json:"result,omitempty"`
+	Error     string                 `json:"error,omitempty"`
+	DurationMs int64                 `json:"duration_ms"`
 }

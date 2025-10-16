@@ -14,3 +14,12 @@ SERVER_LOG_DIR=./logs
 
 # File Watcher Settings
 WATCHER_POLL_INTERVAL_SECONDS=2
+
+# Arcade Tool Provider Settings (optional)
+# Get your API key from https://arcade.dev
+# ARCADE_TOKEN=your-arcade-api-key-here
+# ARCADE_USER_ID=default-user
+
+# Built-in Tool Provider Settings (optional)
+# For web search functionality - get your API key from https://serpapi.com
+# SERP_API_KEY=your-serpapi-key-here

@@ -1,0 +1,42 @@
+{
+  "id": "agentive-frameworks-simple",
+  "version": "1.0.0",
+  "goal": "Research top agentive frameworks with a simple gather-then-summarize approach",
+
+  "config": {
+    "llm": {
+      "provider": "openai",
+      "model": "gpt-4",
+      "temperature": 0.5,
+      "max_tokens": 3000
+    },
+    "tools": {
+      "provider": "builtin"
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "search",
+      "name": "Search for agentive frameworks",
+      "type": "tool",
+      "tool_name": "WebSearch",
+      "tool_arguments": {
+        "query": "top AI agent frameworks 2025 LangChain CrewAI AutoGen comparison",
+        "num_results": 5
+      }
+    },
+    {
+      "id": "analyze",
+      "name": "Analyze and summarize findings",
+      "type": "llm",
+      "prompt": "You are a technical research analyst. Based on the following web search results about agentive AI frameworks, provide a comprehensive summary.\n\nSearch Results:\n{{input}}\n\nProvide a clear summary covering:\n1. What are the most popular agentive frameworks mentioned?\n2. Key features and differentiators of each\n3. Their strengths and use cases\n4. Recent trends or developments\n\nFormat your response as a structured report with clear sections and bullet points."
+    }
+  ],
+
+  "routes": [
+    {"from": "start", "to": "search"},
+    {"from": "search", "to": "analyze"},
+    {"from": "analyze", "to": "end"}
+  ]
+}

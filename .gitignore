@@ -1,4 +1,10 @@
+# Config with secrets
 not7.conf
+
+# Runtime directories
 /logs
 /deploy
 /executions
+
+# Binary
+/not7

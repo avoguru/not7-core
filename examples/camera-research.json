@@ -1,0 +1,33 @@
+{
+  "id": "camera-research",
+  "version": "1.0.0",
+  "goal": "Research the best cameras for content creators in 2025",
+
+  "config": {
+    "llm": {
+      "provider": "openai",
+      "model": "gpt-4",
+      "temperature": 0.7,
+      "max_tokens": 4000
+    },
+    "tools": {
+      "provider": "builtin"
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "research",
+      "name": "Camera Research Agent",
+      "type": "react",
+      "tools_enabled": true,
+      "react_goal": "Research the best cameras for content creators in 2025",
+      "max_iterations": 15
+    }
+  ],
+
+  "routes": [
+    {"from": "start", "to": "research"},
+    {"from": "research", "to": "end"}
+  ]
+}

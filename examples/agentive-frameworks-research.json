@@ -1,0 +1,34 @@
+{
+  "id": "agentive-frameworks-research",
+  "version": "1.0.0",
+  "goal": "Research and analyze top agentive frameworks and AI agent platforms",
+
+  "config": {
+    "llm": {
+      "provider": "openai",
+      "model": "gpt-4",
+      "temperature": 0.5,
+      "max_tokens": 2000
+    },
+    "tools": {
+      "provider": "builtin"
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "research",
+      "name": "Agentive Frameworks Research Agent",
+      "type": "react",
+      "react_goal": "Research the top agentive frameworks and AI agent platforms in 2025. Find information about popular frameworks like LangChain, CrewAI, AutoGen, LangGraph, Arcade, and others. Focus on:\n1. What are the most popular agentive frameworks?\n2. What are their key features and differentiators?\n3. What are their strengths and weaknesses?\n4. Recent developments or trends in the space.\n\nProvide a comprehensive summary with specific examples and comparisons.",
+      "max_iterations": 15,
+      "tools_enabled": true,
+      "thinking_prompt": "You have access to WebSearch and WebFetch tools. Think step by step:\n1. Search for information about popular agentive frameworks\n2. Fetch detailed content from relevant articles\n3. Search for comparisons and recent updates\n4. Synthesize findings into a clear summary\n\nUse WebSearch to find relevant articles, then WebFetch to get detailed content.\n\nWhen you have gathered enough information (aim for 3-5 good sources), provide your final answer starting with 'FINAL:'\n\nRemember: You must output 'FINAL: <your summary>' when you're ready to conclude."
+    }
+  ],
+
+  "routes": [
+    {"from": "start", "to": "research"},
+    {"from": "research", "to": "end"}
+  ]
+}

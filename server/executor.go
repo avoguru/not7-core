@@ -1,7 +1,9 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -43,6 +45,12 @@ func (s *Server) executeAgentWithID(executionID string, agentSpec *spec.AgentSpe
 
 	metadata := exec.GetMetadata()
 	log.Info("Execution completed in %dms, cost: $%.4f", duration, metadata.TotalCost)
+
+	// Save full agent spec with metadata to logs directory for trace viewing
+	agentSpec.Metadata = metadata
+	if err := s.saveExecutionTrace(executionID, agentSpec); err != nil {
+		log.Error("Failed to save execution trace: %v", err)
+	}
 
 	return &ExecutionResponse{
 		ID:       executionID,
@@ -152,6 +160,22 @@ func (s *Server) executeAsyncAgent(executionID string, agentSpec *spec.AgentSpec
 		fmt.Printf("[Async] Failed to save result: %v\n", err)
 	}
 	
-	fmt.Printf("[Async] Completed execution: %s (%.2fs, $%.4f)\n", 
+	fmt.Printf("[Async] Completed execution: %s (%.2fs, $%.4f)\n",
 		executionID, float64(elapsed)/1000, result.Cost)
+}
+
+// saveExecutionTrace saves the full agent spec with metadata to a JSON file
+func (s *Server) saveExecutionTrace(executionID string, agentSpec *spec.AgentSpec) error {
+	traceFile := filepath.Join(s.logDir, fmt.Sprintf("%s-trace.json", executionID))
+
+	data, err := json.MarshalIndent(agentSpec, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal trace: %w", err)
+	}
+
+	if err := os.WriteFile(traceFile, data, 0644); err != nil {
+		return fmt.Errorf("failed to write trace file: %w", err)
+	}
+
+	return nil
 }
