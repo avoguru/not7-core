@@ -12,7 +12,6 @@ import (
 type Config struct {
 	OpenAI  OpenAIConfig
 	Server  ServerConfig
-	Watcher WatcherConfig
 	Builtin BuiltinConfig
 }
 
@@ -26,14 +25,9 @@ type OpenAIConfig struct {
 
 // ServerConfig holds server-specific configuration
 type ServerConfig struct {
-	Port      int
-	DeployDir string
-	LogDir    string
-}
-
-// WatcherConfig holds file watcher settings
-type WatcherConfig struct {
-	PollIntervalSeconds int
+	Port          int
+	ExecutionsDir string
+	LogDir        string
 }
 
 // BuiltinConfig holds built-in tool provider settings
@@ -59,12 +53,9 @@ func LoadConfig(filepath string) (*Config, error) {
 			DefaultMaxTokens:   2000,
 		},
 		Server: ServerConfig{
-			Port:      8080,
-			DeployDir: "./deploy",
-			LogDir:    "./logs",
-		},
-		Watcher: WatcherConfig{
-			PollIntervalSeconds: 2,
+			Port:          8080,
+			ExecutionsDir: "./executions",
+			LogDir:        "./logs",
 		},
 	}
 
@@ -136,18 +127,10 @@ func setConfigValue(cfg *Config, key, value string) error {
 			return fmt.Errorf("invalid port value: %s", value)
 		}
 		cfg.Server.Port = port
-	case "SERVER_DEPLOY_DIR":
-		cfg.Server.DeployDir = value
+	case "SERVER_EXECUTIONS_DIR":
+		cfg.Server.ExecutionsDir = value
 	case "SERVER_LOG_DIR":
 		cfg.Server.LogDir = value
-
-	// Watcher settings
-	case "WATCHER_POLL_INTERVAL_SECONDS":
-		interval, err := strconv.Atoi(value)
-		if err != nil {
-			return fmt.Errorf("invalid poll_interval value: %s", value)
-		}
-		cfg.Watcher.PollIntervalSeconds = interval
 
 	// Builtin tool settings
 	case "SERP_API_KEY":

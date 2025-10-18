@@ -9,11 +9,8 @@ OPENAI_DEFAULT_MAX_TOKENS=2000
 
 # Server Settings
 SERVER_PORT=8080
-SERVER_DEPLOY_DIR=./deploy
+SERVER_EXECUTIONS_DIR=./executions
 SERVER_LOG_DIR=./logs
-
-# File Watcher Settings
-WATCHER_POLL_INTERVAL_SECONDS=2
 
 # Arcade Tool Provider Settings (optional)
 # Get your API key from https://arcade.dev
