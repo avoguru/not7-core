@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	traceMode bool
-	asyncMode bool
+	streamMode bool
+	asyncMode  bool
 )
 
 var runCmd = &cobra.Command{
@@ -24,23 +24,18 @@ var runCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(runCmd)
-	runCmd.Flags().BoolVar(&traceMode, "trace", false, "Show live ReAct reasoning trace (runs locally)")
+	runCmd.Flags().BoolVar(&streamMode, "stream", false, "Stream live agent reasoning")
 	runCmd.Flags().BoolVar(&asyncMode, "async", false, "Run agent in background")
 }
 
 func runAgent(cmd *cobra.Command, args []string) error {
 	specFile := args[0]
 
-	// If trace mode, run locally with enhanced output
-	if traceMode {
-		return cli.RunAgentWithTrace(specFile)
-	}
-
-	// Otherwise, use API client
+	// Always use API client (server must be running)
 	apiClient := client.NewClient("")
 
 	if err := apiClient.CheckHealth(); err != nil {
-		return fmt.Errorf("server not running. Start server first:\n  Terminal 1: not7 serve\n  Terminal 2: not7 run agent.json")
+		return fmt.Errorf("server not running. Start server first:\n  Terminal 1: ./not7 serve\n  Terminal 2: ./not7 run agent.json")
 	}
 
 	agentJSON, err := os.ReadFile(specFile)
@@ -50,7 +45,8 @@ func runAgent(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("📖 Executing: %s\n", specFile)
 
-	result, err := apiClient.RunAgent(agentJSON, asyncMode)
+	// Execute via API with stream and async options
+	result, err := apiClient.RunAgent(agentJSON, asyncMode, streamMode)
 	if err != nil {
 		return err
 	}
@@ -58,7 +54,7 @@ func runAgent(cmd *cobra.Command, args []string) error {
 	if asyncMode {
 		fmt.Printf("\n✅ Submitted (background)\n")
 		fmt.Printf("📋 Execution ID: %s\n\n", result["execution_id"])
-		fmt.Printf("Check: not7 status %s\n", result["execution_id"])
+		fmt.Printf("Check status: ./not7 status %s\n", result["execution_id"])
 	} else {
 		cli.PrintExecutionResult(result)
 	}

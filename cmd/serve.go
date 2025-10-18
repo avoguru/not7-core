@@ -33,7 +33,15 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	// Start server
 	cfg := config.Get()
-	srv := server.NewServer(cfg.Server.Port, cfg.Server.DeployDir, cfg.Server.LogDir)
+
+	// Use executions/ directory instead of deploy/
+	execDir := "./executions"
+	if cfg.Server.DeployDir != "" {
+		// If deploy dir is configured, use executions/ under it for backwards compatibility
+		execDir = cfg.Server.DeployDir + "/executions"
+	}
+
+	srv := server.NewServer(cfg.Server.Port, execDir, cfg.Server.LogDir)
 
 	if err := srv.Start(); err != nil {
 		return fmt.Errorf("server error: %w", err)

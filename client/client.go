@@ -29,11 +29,23 @@ func NewClient(baseURL string) *NOT7Client {
 	}
 }
 
-// RunAgent executes an agent (sync or async)
-func (c *NOT7Client) RunAgent(agentJSON []byte, async bool) (map[string]interface{}, error) {
-	url := c.baseURL + "/api/v1/agents/run"
+// RunAgent executes an agent (sync or async, with optional stream)
+func (c *NOT7Client) RunAgent(agentJSON []byte, async bool, stream bool) (map[string]interface{}, error) {
+	url := c.baseURL + "/api/v1/run?"
+
+	params := []string{}
 	if async {
-		url += "?async=true"
+		params = append(params, "async=true")
+	}
+	if stream {
+		params = append(params, "stream=true")
+	}
+
+	if len(params) > 0 {
+		url += params[0]
+		for i := 1; i < len(params); i++ {
+			url += "&" + params[i]
+		}
 	}
 
 	resp, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(agentJSON))
@@ -59,9 +71,9 @@ func (c *NOT7Client) RunAgent(agentJSON []byte, async bool) (map[string]interfac
 	return result, nil
 }
 
-// GetExecutionStatus gets the status of an execution
-func (c *NOT7Client) GetExecutionStatus(execID string) (map[string]interface{}, error) {
-	url := fmt.Sprintf("%s/api/v1/executions/%s/status", c.baseURL, execID)
+// GetExecution gets the full execution details (status + result if available)
+func (c *NOT7Client) GetExecution(execID string) (map[string]interface{}, error) {
+	url := fmt.Sprintf("%s/api/v1/executions/%s", c.baseURL, execID)
 
 	resp, err := c.httpClient.Get(url)
 	if err != nil {
@@ -84,6 +96,11 @@ func (c *NOT7Client) GetExecutionStatus(execID string) (map[string]interface{}, 
 	}
 
 	return result, nil
+}
+
+// GetExecutionStatus gets the status of an execution (deprecated, use GetExecution)
+func (c *NOT7Client) GetExecutionStatus(execID string) (map[string]interface{}, error) {
+	return c.GetExecution(execID)
 }
 
 // GetExecutionResult gets the final result of an execution
