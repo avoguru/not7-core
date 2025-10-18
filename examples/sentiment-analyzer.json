@@ -1,0 +1,38 @@
+{
+  "id": "sentiment-analyzer",
+  "version": "1.0.0",
+  "goal": "Analyze customer feedback sentiment and generate actionable summary",
+
+  "config": {
+    "llm": {
+      "provider": "openai",
+      "model": "gpt-4",
+      "temperature": 0.3,
+      "max_tokens": 2000
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "analyze",
+      "name": "Sentiment Analysis",
+      "type": "llm",
+      "prompt": "Analyze the sentiment of this customer feedback. Identify:\n1. Overall sentiment (positive/negative/neutral)\n2. Key themes mentioned\n3. Specific pain points or praise\n\nInput: 'The new dashboard is incredibly slow and keeps crashing. However, I love the new export feature - it saves me hours! Support team was helpful but took 2 days to respond.'\n\nReturn as JSON: {\"sentiment\": \"...\", \"themes\": [...], \"pain_points\": [...], \"positives\": [...]}",
+      "output_format": "json"
+    },
+    {
+      "id": "summarize",
+      "name": "Executive Summary",
+      "type": "llm",
+      "prompt": "Based on this sentiment analysis, create a concise executive summary (3-4 sentences) for leadership. Focus on:\n1. Overall customer sentiment\n2. Top priority issue to address\n3. One positive highlight\n\nKeep it professional and action-oriented.",
+      "input_format": "json",
+      "output_format": "text"
+    }
+  ],
+
+  "routes": [
+    {"from": "start", "to": "analyze"},
+    {"from": "analyze", "to": "summarize"},
+    {"from": "summarize", "to": "end"}
+  ]
+}

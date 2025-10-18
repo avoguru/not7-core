@@ -21,7 +21,7 @@
       "name": "Camera Research Agent",
       "type": "react",
       "tools_enabled": true,
-      "react_goal": "Research the best cameras for content creators in 2025",
+      "react_goal": "Research the best cameras for content creators in 2025. Find 3-5 top recommendations with specific model names, key features, and pricing. Use WebSearch to find recent reviews and comparisons.",
       "max_iterations": 15
     }
   ],

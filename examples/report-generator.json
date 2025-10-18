@@ -1,0 +1,47 @@
+{
+  "id": "report-generator",
+  "version": "1.0.0",
+  "goal": "Generate a structured competitive analysis report from raw market data",
+
+  "config": {
+    "llm": {
+      "provider": "openai",
+      "model": "gpt-4",
+      "temperature": 0.5,
+      "max_tokens": 3000
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "extract",
+      "name": "Extract Key Data",
+      "type": "llm",
+      "prompt": "Extract structured data from this market information:\n\n'GitHub Copilot: $10/month, 37M users, supports VS Code and JetBrains. Cursor: $20/month, 5M users, dedicated IDE with chat and composer. Codeium: Free tier + $12/month pro, 10M users, multi-IDE support.'\n\nReturn as JSON array:\n[{\"product\": \"...\", \"pricing\": \"...\", \"users\": \"...\", \"key_features\": [...]}]",
+      "output_format": "json"
+    },
+    {
+      "id": "analyze",
+      "name": "Competitive Analysis",
+      "type": "llm",
+      "prompt": "Analyze this competitive data and identify:\n1. Market leader and why\n2. Best value proposition\n3. Key differentiators between products\n4. Market gaps or opportunities\n\nReturn as JSON: {\"market_leader\": {\"product\": \"...\", \"reasoning\": \"...\"}, \"best_value\": \"...\", \"differentiators\": [...], \"opportunities\": [...]}",
+      "input_format": "json",
+      "output_format": "json"
+    },
+    {
+      "id": "format",
+      "name": "Generate Executive Report",
+      "type": "llm",
+      "prompt": "Create a professional executive summary report from this competitive analysis. Include:\n\n## Executive Summary\n[2-3 sentence overview]\n\n## Market Leader\n[Brief analysis]\n\n## Competitive Positioning\n[Key insights]\n\n## Strategic Recommendations\n[2-3 actionable recommendations]\n\nKeep it concise and business-focused (max 200 words).",
+      "input_format": "json",
+      "output_format": "text"
+    }
+  ],
+
+  "routes": [
+    {"from": "start", "to": "extract"},
+    {"from": "extract", "to": "analyze"},
+    {"from": "analyze", "to": "format"},
+    {"from": "format", "to": "end"}
+  ]
+}

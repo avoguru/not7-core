@@ -1,0 +1,33 @@
+{
+  "id": "ev-market-research",
+  "version": "1.0.0",
+  "goal": "Research the best electric vehicles for families in 2025",
+
+  "config": {
+    "llm": {
+      "provider": "openai",
+      "model": "gpt-4",
+      "temperature": 0.7,
+      "max_tokens": 4000
+    },
+    "tools": {
+      "provider": "builtin"
+    }
+  },
+
+  "nodes": [
+    {
+      "id": "research",
+      "name": "EV Market Research Agent",
+      "type": "react",
+      "tools_enabled": true,
+      "react_goal": "Research the best electric vehicles for families in 2025. Find 3-5 top recommendations focusing on:\n1. SUV and minivan EVs with good range\n2. Safety ratings and family features\n3. Pricing and availability\n4. Charging infrastructure considerations\n\nProvide specific model names, range specs, and starting prices.",
+      "max_iterations": 15
+    }
+  ],
+
+  "routes": [
+    {"from": "start", "to": "research"},
+    {"from": "research", "to": "end"}
+  ]
+}
