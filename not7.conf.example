@@ -14,7 +14,7 @@ SERVER_LOG_DIR=./logs
 
 # Arcade Tool Provider Settings (optional)
 # Get your API key from https://arcade.dev
-# ARCADE_TOKEN=your-arcade-api-key-here
+# ARCADE_API_KEY=your-arcade-api-key-here
 # ARCADE_USER_ID=default-user
 
 # Built-in Tool Provider Settings (optional)

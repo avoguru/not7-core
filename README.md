@@ -19,6 +19,34 @@
 
 NOT7 is a **config-driven agent runtime** delivered as a **single binary**. Agents are defined as **declarative JSON configurations** and executed with **zero dependencies**. No programming languages. No installations. Just drop the binary, declare your agent in JSON, and run.
 
+## Architecture Overview
+
+```
+            ┌───────────────────────────────┐
+            │     USER / DEVELOPER          │
+            └───────────────┬───────────────┘
+                            ↓
+            ┌───────────────────────────────┐
+            │   JSON Agent Definition       │
+            │   (nodes, routes, config)     │
+            └───────────────┬───────────────┘
+                            ↓
+            ┌───────────────────────────────┐
+            │   NOT7 CORE RUNTIME           │
+            │   Executor Engine             │
+            └───────────────┬───────────────┘
+                            ↓
+        ┌───────────────────┼───────────────────┐
+        ↓                   ↓                   ↓
+┌───────────────┐  ┌────────────────┐  ┌───────────────┐
+│ LLM Provider  │  │ Tool Providers │  │    Storage    │
+│               │  │                │  │               │
+│ - OpenAI      │  │ - Native       │  │ - Executions  │
+│ - GPT-4/3.5   │  │ - Arcade       │  │ - Traces      │
+│               │  │   (Gmail, Maps)│  │ - Logs        │
+└───────────────┘  └────────────────┘  └───────────────┘
+```
+
 ---
 
 ## Table of Contents
@@ -70,22 +98,25 @@ This is the evolutionary next stage of integration platforms - applied to agenti
 
 ## Key Features
 
-**Config-Driven**  
+**Config-Driven**
 Single binary with simple configuration file. No programming languages to install.
 
-**Declarative JSON**  
+**Declarative JSON**
 Agents are pure JSON specifications. No code required.
 
-**LLM-Native**  
+**LLM-Native**
 JSON specs are trivial for LLMs to generate. AI writes specs, NOT7 executes them.
 
-**Transparent Evolution**  
+**Multi-Tool Orchestration**
+Use multiple tool providers in a single agent. Each node can have its own toolkit configuration.
+
+**Transparent Evolution**
 Version your agent specs. See exactly how your agent evolved from v1 to v10.
 
-**Production Ready**  
+**Production Ready**
 Server mode with HTTP API and deploy folder watching. Structured logging for observability.
 
-**Zero Dependencies**  
+**Zero Dependencies**
 Download one binary and run. Works on macOS, Linux, Windows.
 
 ---
@@ -98,12 +129,25 @@ Download one binary and run. Works on macOS, Linux, Windows.
 curl -L https://github.com/not7/core/raw/main/dist/not7-darwin-arm64 -o not7
 chmod +x not7
 cp not7.conf.example not7.conf
-# Edit not7.conf: OPENAI_API_KEY=sk-your-key
-./not7 run examples/poem-generator.json
+# Edit not7.conf: Add your OPENAI_API_KEY
+./not7 run examples/camera-research.json
 ```
 
-**macOS (Intel) / Linux / Windows:**  
+**macOS (Intel) / Linux / Windows:**
 See [dist/](dist/) folder for other platform binaries.
+
+**Try the Arcade Integration (Google Maps + Gmail):**
+```bash
+# Setup Arcade.dev credentials in not7.conf
+# ARCADE_API_KEY=your-key
+# ARCADE_USER_ID=your-user-id
+
+# Authorize Google services
+./not7 authorize
+
+# Run lunch recommendations demo (update email in JSON first!)
+./not7 run examples/arcade-lunch-demo.json
+```
 
 **That's it!** The agent executes and generates output.
 
@@ -286,9 +330,140 @@ Creates binaries in `dist/` for macOS, Linux, Windows.
 
 ---
 
+## Tool Integration
+
+**✅ Arcade.dev Integration (Available Now)**
+
+NOT7 integrates with [Arcade.dev](https://arcade.dev) for pre-built tool integrations:
+
+- **Gmail** - Send, draft, search, delete emails
+- **Google Calendar, Maps, Contacts, Docs, Drive, Sheets, Slides** - Full suite of Google services
+- **Per-Node Toolkit Configuration** - Use multiple toolkits in a single agent
+
+### Single Toolkit Example
+
+```json
+{
+  "config": {
+    "tools": {
+      "provider": "arcade-gmail"
+    }
+  },
+  "nodes": [{
+    "type": "react",
+    "tools_enabled": true,
+    "react_goal": "Send an email summarizing the analysis"
+  }]
+}
+```
+
+### Multi-Toolkit Example (Per-Node Configuration)
+
+Use different toolkits in different nodes:
+
+```json
+{
+  "config": {
+    "llm": {
+      "provider": "openai",
+      "model": "gpt-4o"
+    }
+  },
+  "nodes": [
+    {
+      "id": "find-restaurants",
+      "type": "react",
+      "tools_enabled": true,
+      "config": {
+        "tools": {
+          "provider": "arcade-googlemaps"
+        }
+      },
+      "react_goal": "Find 3 lunch restaurants in San Francisco"
+    },
+    {
+      "id": "format-email",
+      "type": "llm",
+      "prompt": "Format the restaurant list as a clean email"
+    },
+    {
+      "id": "send-email",
+      "type": "tool",
+      "config": {
+        "tools": {
+          "provider": "arcade-gmail"
+        }
+      },
+      "tool_name": "SendEmail",
+      "tool_arguments": {
+        "recipient": "user@example.com",
+        "subject": "Lunch Recommendations",
+        "body": "{{input}}"
+      }
+    }
+  ],
+  "routes": [
+    {"from": "start", "to": "find-restaurants"},
+    {"from": "find-restaurants", "to": "format-email"},
+    {"from": "format-email", "to": "send-email"},
+    {"from": "send-email", "to": "end"}
+  ]
+}
+```
+
+**Multi-Toolkit Workflow:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Agent: Lunch Recommendations                               │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Node 1: find-restaurants                                  │
+│  ┌─────────────────────────────────┐                       │
+│  │ Type: react                     │                       │
+│  │ Tools: arcade-googlemaps  ◄─────┼─── Google Maps API   │
+│  │ Goal: Find 3 restaurants        │                       │
+│  └─────────────────────────────────┘                       │
+│              ↓                                              │
+│  Node 2: format-email                                      │
+│  ┌─────────────────────────────────┐                       │
+│  │ Type: llm                       │                       │
+│  │ Provider: OpenAI          ◄─────┼─── OpenAI API        │
+│  │ Prompt: Format nicely           │                       │
+│  └─────────────────────────────────┘                       │
+│              ↓                                              │
+│  Node 3: send-email                                        │
+│  ┌─────────────────────────────────┐                       │
+│  │ Type: tool                      │                       │
+│  │ Tools: arcade-gmail       ◄─────┼─── Gmail API         │
+│  │ Tool: SendEmail                 │                       │
+│  └─────────────────────────────────┘                       │
+│              ↓                                              │
+│  Output: Email sent with recommendations                   │
+└─────────────────────────────────────────────────────────────┘
+
+3 Nodes × 3 Different Providers = Multi-Toolkit Orchestration
+```
+
+**Key Features:**
+- **Node-level override**: Each node can specify its own toolkit
+- **Tool manager pooling**: Same toolkit reused across nodes (efficient)
+- **arcade-{toolkit} pattern**: Clear, explicit toolkit naming (e.g., `arcade-gmail`, `arcade-googlemaps`)
+
+**Setup:**
+```bash
+# Add to not7.conf
+ARCADE_API_KEY=your-api-key
+ARCADE_USER_ID=your-user-id
+
+# Authorize (one-time interactive OAuth)
+./not7 authorize
+```
+
+---
+
 ## Roadmap
 
-**Tool Integration**  
+**Tool Integration - Next Steps**
 MCP protocol support for external tools (databases, APIs, file systems)
 
 **Dynamic Routing**  

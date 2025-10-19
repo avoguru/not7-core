@@ -48,6 +48,7 @@ type Node struct {
 	InputFormat  string     `json:"input_format,omitempty"`
 	OutputFormat string     `json:"output_format,omitempty"`
 	LLM          *LLMConfig `json:"llm,omitempty"`
+	Config       *Config    `json:"config,omitempty"` // Node-level config (overrides agent-level)
 
 	// ReAct-specific fields
 	ReActGoal      string `json:"react_goal,omitempty"`

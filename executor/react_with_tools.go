@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -70,27 +71,11 @@ func parseToolCall(response string) (string, map[string]interface{}, bool) {
 
 	jsonBlock := jsonText[braceStart:braceEnd]
 
-	// Parse JSON (simplified - you might want to use encoding/json here)
-	// For now, return empty map and let the tool provider handle it
+	// Parse JSON properly using encoding/json
 	args := make(map[string]interface{})
-
-	// Quick and dirty JSON parsing for simple cases
-	// Remove braces
-	content := strings.Trim(jsonBlock, "{}")
-	content = strings.TrimSpace(content)
-
-	if content != "" {
-		// Split by commas (naive, doesn't handle nested objects)
-		pairs := strings.Split(content, ",")
-		for _, pair := range pairs {
-			kv := strings.SplitN(pair, ":", 2)
-			if len(kv) == 2 {
-				key := strings.Trim(strings.TrimSpace(kv[0]), "\"")
-				value := strings.TrimSpace(kv[1])
-				value = strings.Trim(value, "\"")
-				args[key] = value
-			}
-		}
+	if err := json.Unmarshal([]byte(jsonBlock), &args); err != nil {
+		// If JSON parsing fails, return empty args
+		return toolName, make(map[string]interface{}), true
 	}
 
 	return toolName, args, true

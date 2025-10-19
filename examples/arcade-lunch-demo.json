@@ -1,0 +1,59 @@
+{
+  "id": "arcade-lunch-demo",
+  "version": "1.0.0",
+  "goal": "Arcade Integration Demo: Lunch Recommendations via Google Maps + Gmail",
+  "description": "Demonstrates Arcade.dev integration with multiple Google services - uses Google Maps to find 3 lunch recommendations and Gmail to email them. Shows per-node toolkit configuration.",
+  "config": {
+    "llm": {
+      "provider": "openai",
+      "model": "gpt-4o",
+      "temperature": 0.7,
+      "max_tokens": 2000
+    }
+  },
+  "nodes": [
+    {
+      "id": "find-restaurants",
+      "name": "Find Lunch Recommendations",
+      "type": "react",
+      "tools_enabled": true,
+      "config": {
+        "tools": {
+          "provider": "arcade-googlemaps"
+        }
+      },
+      "react_goal": "Find 3 highly-rated restaurants in San Francisco for lunch today. For each restaurant, get: name, address, rating, and brief description. Make sure to find 3 different restaurants.",
+      "thinking_prompt": "Use Google Maps to search for lunch restaurants in San Francisco. Find 3 different options.\n\nWhen done: FINAL: [List of 3 restaurants with name, address, rating, and description for each]",
+      "max_iterations": 8
+    },
+    {
+      "id": "format-recommendations",
+      "name": "Format Recommendations",
+      "type": "llm",
+      "prompt": "Format the restaurant recommendations into a simple plain text email. No greetings, no sign-offs, no markdown.\n\nStart with:\nLunch Recommendations for the Day\n\nThen list each of the 3 restaurants with:\n- Name\n- Address\n- Rating (if available)\n- Description\n\nUse simple formatting, no special characters or emojis. Keep it clean and readable.",
+      "output_format": "text"
+    },
+    {
+      "id": "send-email",
+      "name": "Send Recommendations Email",
+      "type": "tool",
+      "config": {
+        "tools": {
+          "provider": "arcade-gmail"
+        }
+      },
+      "tool_name": "SendEmail",
+      "tool_arguments": {
+        "recipient": "user@example.com",
+        "subject": "Your Lunch Recommendations for Today",
+        "body": "{{input}}"
+      }
+    }
+  ],
+  "routes": [
+    {"from": "start", "to": "find-restaurants"},
+    {"from": "find-restaurants", "to": "format-recommendations"},
+    {"from": "format-recommendations", "to": "send-email"},
+    {"from": "send-email", "to": "end"}
+  ]
+}

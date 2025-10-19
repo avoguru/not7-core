@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/not7/core/config"
@@ -10,6 +11,7 @@ import (
 	"github.com/not7/core/logger"
 	"github.com/not7/core/spec"
 	"github.com/not7/core/tools"
+	"github.com/not7/core/tools/arcade"
 	"github.com/not7/core/tools/builtin"
 )
 
@@ -22,13 +24,14 @@ type Logger interface {
 
 // Executor runs an agent specification
 type Executor struct {
-	spec      *spec.AgentSpec
-	llmClient *llm.OpenAIClient
-	nodeMap   map[string]*spec.Node
-	results   map[string]*spec.NodeResult
-	logger    Logger
-	useCLI    bool // Flag to determine if we should print to stdout
-	toolMgr   *tools.Manager // Tool manager for tool calling
+	spec         *spec.AgentSpec
+	llmClient    *llm.OpenAIClient
+	nodeMap      map[string]*spec.Node
+	results      map[string]*spec.NodeResult
+	logger       Logger
+	useCLI       bool                        // Flag to determine if we should print to stdout
+	toolManagers map[string]*tools.Manager // Pool of tool managers by provider
+	cfg          *config.Config              // Global config for tool initialization
 }
 
 // NewExecutor creates a new executor for CLI mode (prints to stdout)
@@ -54,41 +57,132 @@ func newExecutor(agentSpec *spec.AgentSpec, log Logger, useCLI bool) (*Executor,
 		nodeMap[agentSpec.Nodes[i].ID] = &agentSpec.Nodes[i]
 	}
 
-	// Initialize tool manager if tools are configured
-	var toolMgr *tools.Manager
+	// Get global config
+	cfg := config.Get()
+
+	// Create executor with tool manager pool
+	executor := &Executor{
+		spec:         agentSpec,
+		llmClient:    llmClient,
+		nodeMap:      nodeMap,
+		results:      make(map[string]*spec.NodeResult),
+		logger:       log,
+		useCLI:       useCLI,
+		toolManagers: make(map[string]*tools.Manager),
+		cfg:          cfg,
+	}
+
+	// Initialize default tool manager if agent-level tools are configured
 	if agentSpec.Config != nil && agentSpec.Config.Tools != nil {
-		cfg := config.Get()
-
-		toolMgr = tools.NewManager("")
-
-		// Register builtin tool provider
-		if agentSpec.Config.Tools.Provider == "builtin" && cfg.Builtin.SerpAPIKey != "" {
-			builtinProvider := builtin.NewProvider(cfg.Builtin.SerpAPIKey)
-			providerConfig := map[string]string{
-				"serp_api_key": cfg.Builtin.SerpAPIKey,
-			}
-
-			if err := builtinProvider.Initialize(providerConfig); err != nil {
-				return nil, fmt.Errorf("failed to initialize builtin provider: %w", err)
-			}
-
-			if err := toolMgr.RegisterProvider(builtinProvider); err != nil {
-				return nil, fmt.Errorf("failed to register builtin provider: %w", err)
-			}
-
-			log.Info("Builtin tool provider initialized with %d tools", len(toolMgr.ListTools()))
+		provider := agentSpec.Config.Tools.Provider
+		_, err := executor.getOrCreateToolManager(provider)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize default tool manager: %w", err)
 		}
 	}
 
-	return &Executor{
-		spec:      agentSpec,
-		llmClient: llmClient,
-		nodeMap:   nodeMap,
-		results:   make(map[string]*spec.NodeResult),
-		logger:    log,
-		useCLI:    useCLI,
-		toolMgr:   toolMgr,
-	}, nil
+	return executor, nil
+}
+
+// getOrCreateToolManager returns a tool manager for the given provider,
+// creating and initializing it if it doesn't exist in the pool
+func (e *Executor) getOrCreateToolManager(provider string) (*tools.Manager, error) {
+	// Check if already exists in pool
+	if mgr, exists := e.toolManagers[provider]; exists {
+		return mgr, nil
+	}
+
+	// Create new tool manager
+	toolMgr := tools.NewManager("")
+
+	// Initialize based on provider type
+	if provider == "builtin" {
+		if e.cfg.Builtin.SerpAPIKey == "" {
+			return nil, fmt.Errorf("builtin provider requires SERP_API_KEY in not7.conf")
+		}
+
+		builtinProvider := builtin.NewProvider(e.cfg.Builtin.SerpAPIKey)
+		providerConfig := map[string]string{
+			"serp_api_key": e.cfg.Builtin.SerpAPIKey,
+		}
+
+		if err := builtinProvider.Initialize(providerConfig); err != nil {
+			return nil, fmt.Errorf("failed to initialize builtin provider: %w", err)
+		}
+
+		if err := toolMgr.RegisterProvider(builtinProvider); err != nil {
+			return nil, fmt.Errorf("failed to register builtin provider: %w", err)
+		}
+
+		e.logger.Info("Builtin tool provider initialized with %d tools", len(toolMgr.ListTools()))
+	} else if provider == "arcade" || (len(provider) > 7 && provider[:7] == "arcade-") {
+		// Arcade provider (supports arcade-{toolkit} pattern)
+		if e.cfg.Arcade.APIKey == "" {
+			return nil, fmt.Errorf("ARCADE_API_KEY not configured in not7.conf")
+		}
+		if e.cfg.Arcade.UserID == "" {
+			return nil, fmt.Errorf("ARCADE_USER_ID not configured in not7.conf")
+		}
+
+		// Extract toolkit name from provider (e.g., "arcade-spotify" → "Spotify")
+		toolkit := "Gmail" // Default for backward compatibility with "arcade"
+		if len(provider) > 7 && provider[:7] == "arcade-" {
+			toolkit = provider[7:]
+			// Capitalize first letter for API compatibility
+			if len(toolkit) > 0 {
+				toolkit = strings.ToUpper(toolkit[:1]) + toolkit[1:]
+			}
+		}
+
+		arcadeProvider := arcade.NewProvider(e.cfg.Arcade.APIKey, e.cfg.Arcade.UserID, toolkit)
+		providerConfig := map[string]string{
+			"arcade_api_key": e.cfg.Arcade.APIKey,
+			"arcade_user_id": e.cfg.Arcade.UserID,
+		}
+
+		if err := arcadeProvider.Initialize(providerConfig); err != nil {
+			return nil, fmt.Errorf("failed to initialize arcade provider: %w", err)
+		}
+
+		// Check authorization status and handle interactive auth if needed
+		ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
+		defer cancel()
+
+		if err := arcadeProvider.CheckAndHandleAuthorization(ctx); err != nil {
+			return nil, fmt.Errorf("arcade authorization failed: %w", err)
+		}
+
+		if err := toolMgr.RegisterProvider(arcadeProvider); err != nil {
+			return nil, fmt.Errorf("failed to register arcade provider: %w", err)
+		}
+
+		e.logger.Info("Arcade tool provider initialized with %d %s tools", len(toolMgr.ListTools()), toolkit)
+	} else {
+		return nil, fmt.Errorf("unsupported tool provider: %s", provider)
+	}
+
+	// Store in pool
+	e.toolManagers[provider] = toolMgr
+	return toolMgr, nil
+}
+
+// getToolManagerForNode resolves and returns the appropriate tool manager for a node
+func (e *Executor) getToolManagerForNode(node *spec.Node) (*tools.Manager, error) {
+	// Check node-level config first (highest priority)
+	if node.Config != nil && node.Config.Tools != nil {
+		provider := node.Config.Tools.Provider
+		return e.getOrCreateToolManager(provider)
+	}
+
+	// Fall back to agent-level config
+	if e.spec.Config != nil && e.spec.Config.Tools != nil {
+		provider := e.spec.Config.Tools.Provider
+		// Should already exist from initialization, but get or create just in case
+		return e.getOrCreateToolManager(provider)
+	}
+
+	// No tools configured
+	return nil, nil
 }
 
 // Execute runs the agent
@@ -203,8 +297,16 @@ func (e *Executor) executeNode(nodeID string, input string) (string, error) {
 		output, cost, err = e.executeLLMNode(node, input)
 	case "react":
 		// Check if tools are enabled for this node
-		if node.ToolsEnabled && e.toolMgr != nil && e.toolMgr.HasTools() {
-			output, cost, reactTrace, err = e.executeReActNodeWithTools(node, input, e.toolMgr)
+		if node.ToolsEnabled {
+			// Resolve tool manager for this node
+			toolMgr, toolErr := e.getToolManagerForNode(node)
+			if toolErr != nil {
+				err = fmt.Errorf("failed to get tool manager: %w", toolErr)
+			} else if toolMgr != nil && toolMgr.HasTools() {
+				output, cost, reactTrace, err = e.executeReActNodeWithTools(node, input, toolMgr)
+			} else {
+				output, cost, reactTrace, err = e.executeReActNode(node, input)
+			}
 		} else {
 			output, cost, reactTrace, err = e.executeReActNode(node, input)
 		}
@@ -243,7 +345,12 @@ func (e *Executor) executeNode(nodeID string, input string) (string, error) {
 
 // executeToolNode executes an explicit tool node
 func (e *Executor) executeToolNode(node *spec.Node, input string) (string, float64, error) {
-	if e.toolMgr == nil {
+	// Resolve tool manager for this node
+	toolMgr, err := e.getToolManagerForNode(node)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to get tool manager: %w", err)
+	}
+	if toolMgr == nil {
 		return "", 0, fmt.Errorf("tool manager not initialized - tools not configured")
 	}
 
@@ -270,7 +377,7 @@ func (e *Executor) executeToolNode(node *spec.Node, input string) (string, float
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	result, err := e.toolMgr.ExecuteTool(ctx, node.ToolName, args)
+	result, err := toolMgr.ExecuteTool(ctx, node.ToolName, args)
 	if err != nil {
 		return "", 0, fmt.Errorf("tool execution failed: %w", err)
 	}

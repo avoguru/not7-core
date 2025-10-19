@@ -13,6 +13,7 @@ type Config struct {
 	OpenAI  OpenAIConfig
 	Server  ServerConfig
 	Builtin BuiltinConfig
+	Arcade  ArcadeConfig
 }
 
 // OpenAIConfig holds OpenAI-specific configuration
@@ -33,6 +34,12 @@ type ServerConfig struct {
 // BuiltinConfig holds built-in tool provider settings
 type BuiltinConfig struct {
 	SerpAPIKey string
+}
+
+// ArcadeConfig holds Arcade.dev tool provider settings
+type ArcadeConfig struct {
+	APIKey string
+	UserID string
 }
 
 var globalConfig *Config
@@ -135,6 +142,12 @@ func setConfigValue(cfg *Config, key, value string) error {
 	// Builtin tool settings
 	case "SERP_API_KEY":
 		cfg.Builtin.SerpAPIKey = value
+
+	// Arcade tool settings
+	case "ARCADE_API_KEY":
+		cfg.Arcade.APIKey = value
+	case "ARCADE_USER_ID":
+		cfg.Arcade.UserID = value
 
 	default:
 		return fmt.Errorf("unknown config key: %s", key)
